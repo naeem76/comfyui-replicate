@@ -7,11 +7,11 @@ import argparse
 
 def format_json_file(file_path):
     try:
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
             data["run_count"] = 0
 
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
     except json.JSONDecodeError:
         print(f"Error: {file_path} contains invalid JSON")

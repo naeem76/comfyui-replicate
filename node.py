@@ -42,6 +42,7 @@ def create_comfyui_node(schema):
         CATEGORY = "Replicate"
 
         def convert_input_images_to_base64(self, kwargs):
+            array_inputs = inputs_that_need_arrays(schema)
             for key, value in kwargs.items():
                 if value is not None:
                     input_type = (
@@ -49,13 +50,21 @@ def create_comfyui_node(schema):
                         or self.INPUT_TYPES().get("optional", {}).get(key, (None,))[0]
                     )
                     if input_type == "IMAGE":
-                        kwargs[key] = self.image_to_base64(value)
+                        if key in array_inputs:
+                            kwargs[key] = [self.image_to_base64(img) for img in value]
+                        else:
+                            kwargs[key] = self.image_to_base64(value)
                     elif input_type == "AUDIO":
                         kwargs[key] = self.audio_to_base64(value)
 
         def image_to_base64(self, image):
             if isinstance(image, torch.Tensor):
-                image = image.permute(0, 3, 1, 2).squeeze(0)
+                if image.dim() == 4:
+                    # Batch format [B, H, W, C] - take first image
+                    image = image.permute(0, 3, 1, 2).squeeze(0)
+                elif image.dim() == 3:
+                    # Single image [H, W, C] from array split
+                    image = image.permute(2, 0, 1)
                 to_pil = transforms.ToPILImage()
                 pil_image = to_pil(image)
             else:
@@ -101,7 +110,17 @@ def create_comfyui_node(schema):
                             kwargs[input_name] = []
                         else:
                             kwargs[input_name] = kwargs[input_name].split("\n")
-                    else:
+                    elif isinstance(kwargs[input_name], torch.Tensor):
+                        input_type = (
+                            self.INPUT_TYPES()["required"].get(input_name, (None,))[0]
+                            or self.INPUT_TYPES().get("optional", {}).get(input_name, (None,))[0]
+                        )
+                        if input_type == "IMAGE":
+                            batch_size = kwargs[input_name].shape[0]
+                            kwargs[input_name] = [kwargs[input_name][i] for i in range(batch_size)]
+                        else:
+                            kwargs[input_name] = [kwargs[input_name]]
+                    elif not isinstance(kwargs[input_name], list):
                         kwargs[input_name] = [kwargs[input_name]]
 
         def log_input(self, kwargs):

@@ -77,12 +77,21 @@ def schema_to_comfyui_input_types(schema):
         if "enum" in prop_data:
             input_type = prop_data["enum"]
         elif "type" in prop_data:
-            input_type = convert_to_comfyui_input_type(
-                prop_name,
-                prop_data["type"],
-                prop_data.get("format"),
-                default_example_input,
-            )
+            # Check for array of image URIs
+            if (
+                prop_data["type"] == "array"
+                and prop_data.get("items", {}).get("type") == "string"
+                and prop_data.get("items", {}).get("format") == "uri"
+                and any(x in prop_name.lower() for x in ["image", "mask"])
+            ):
+                input_type = "IMAGE"
+            else:
+                input_type = convert_to_comfyui_input_type(
+                    prop_name,
+                    prop_data["type"],
+                    prop_data.get("format"),
+                    default_example_input,
+                )
         else:
             input_type = "STRING"
 
